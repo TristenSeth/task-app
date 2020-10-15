@@ -53,6 +53,33 @@ app.get('/users/:id', async (req, res) => {
     }
 })
 
+
+//update a user by id
+app.patch('/users/:id', async (req, res) => {
+    const updates = Object.keys(req.body)
+    const allowed_updates = ['name', 'email', 'password', 'age']
+    const is_valid_operation = updates.every((update) => allowed_updates.includes(update))
+
+    //check if invalid operations where requested
+    if (!is_valid_operation) {
+        return res.status(400).send({error: "Invalid updates!"})
+    }
+
+    try {
+        const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true})
+
+        //check that we found a user
+        if (!user) {
+            //no user found
+            return res.status(404).send()
+        }
+
+        res.send(user)
+    } catch (e) {
+        res.status(400).send(e)
+    }
+})
+
 //task creation endpoint
 app.post('/tasks', async (req, res) => {
     //create new task
@@ -92,6 +119,30 @@ app.get('/tasks/:id', async (req, res) => {
 
 })
 
+app.patch('/tasks/:id', async (req, res) => {
+    //verify its a legal operation
+    const updates = Object.keys(req.body)
+    const allowed_updates = ['description', 'completed']
+    const is_valid_update = updates.every((update) => allowed_updates.includes(update))
+
+    if (!is_valid_update) {
+        return res.status(400).send('Invalid Update on task!')
+    }
+
+    try {
+        const task = await Task.findByIdAndUpdate(req.params.id, req.body, {new: true, runValidators: true})
+
+        //no user found
+        if (!task) {
+            return res.send(404).send()
+        }
+
+        res.send(task)
+
+    } catch (e) {
+        res.status(400).send(e)
+    }
+})
 
 //set app to listen on port
 app.listen(port, () => {
