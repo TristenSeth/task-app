@@ -5,13 +5,17 @@ const Task = require('./models/tasks')
 
 
 const app = express()
+//listen on whatever port is given, or if none is given use port 3000 for local tests
 const port = process.env.PORT || 3000
 
 //make sure it automatically parses json data
 app.use(express.json())
 
 
-//user creation endpoint
+/* Path to create an individual user in the database
+ * Sends a 201 code back to requestor on success, and
+ * a 400code on error
+ */
 app.post('/users', async (req, res) => {
     //create the user
     const user = new User(req.body)
@@ -26,7 +30,9 @@ app.post('/users', async (req, res) => {
     }
 })
 
-//endpoint to get users
+/* Path to get all users. On error sends back a 500 status to requestor
+ * On success sends back list of users in the database
+ */
 app.get('/users', async (req, res) => {
     //find all users in database
     try {
@@ -37,13 +43,16 @@ app.get('/users', async (req, res) => {
     }
 })
 
-//endpoint to get individual users
+/* Path to get individual users by id. If no user is found, return a 404 status to requestor
+ * If user is found, return user to requestor with default status code. Otherwise, on error return a 500 status
+ */
 app.get('/users/:id', async (req, res) => {
     const _id = req.params.id
 
     try {
         const user = await User.findById(_id)
         if (!user) {
+            //no user found
             return res.status(404).send()
         }
 
@@ -54,7 +63,13 @@ app.get('/users/:id', async (req, res) => {
 })
 
 
-//update a user by id
+/* Path to update a user by ID using the patch http method/header
+ * Takes in the user/:id path where :id represents the user id in our mongoDB database
+ * It checks if the update is a valid operation (changes a valid field for our user model)
+ * and runs our validator tests against the updated user. If it is not a valid update,
+ * we send a 400 status back. Otherwise, if a user is not found we send a 404 and a 200 on success.
+ * On error, we send a 400 code back to the client.
+ */
 app.patch('/users/:id', async (req, res) => {
     const updates = Object.keys(req.body)
     const allowed_updates = ['name', 'email', 'password', 'age']
@@ -66,6 +81,7 @@ app.patch('/users/:id', async (req, res) => {
     }
 
     try {
+        //asynchronously find user by id and update them. Return the new updated user and run validator tests on it.
         const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true})
 
         //check that we found a user
@@ -74,13 +90,42 @@ app.patch('/users/:id', async (req, res) => {
             return res.status(404).send()
         }
 
+        //send updated user back to requestor
         res.send(user)
     } catch (e) {
+        //error occured
         res.status(400).send(e)
     }
 })
 
-//task creation endpoint
+/* Path for delete http method to delete individual users by id in our database
+ *  takes in the users/:id path and tries to delete the user. If no user is found a 404 status
+ * is sent back. If a user is found the deleted users info is sent back with a 200 status code
+ * if an error occurs a 500 status is sent back
+ */
+app.delete('/users/:id', async (req, res) => {
+    try {
+        //try to find and delete user
+        const user = await User.findByIdAndDelete(req.params.id)
+
+        if (!user) {
+            no user found
+            return res.status(404).send()
+        }
+
+        //user found
+        res.send(user)
+    } catch (e) {
+        //error occured; perhaps incorrect body for request?
+        res.status(500).send()
+    }
+})
+
+
+/* Path to create an individual task in the database
+ * Sends a 201 code back to requestor on success, and
+ * a 400 code on error
+ */
 app.post('/tasks', async (req, res) => {
     //create new task
     const task = new Task(req.body)
@@ -93,7 +138,9 @@ app.post('/tasks', async (req, res) => {
     }
 })
 
-//endpoint to fetch all tasks
+/* Path to get all tasks. On error sends back a 500 status to requestor
+ * On success sends back list of tasks in the database
+ */
 app.get('/tasks', async (req, res) => {
     try {
         const tasks = await Task.find({})
@@ -103,7 +150,9 @@ app.get('/tasks', async (req, res) => {
     }
 })
 
-//endpoint to fecth task by id
+/* Path to get individual tasks by id. If no task is found, return a 404 status to requestor
+ * If task is found, return task to requestor with default status code. Otherwise, on error return a 500 status
+ */
 app.get('/tasks/:id', async (req, res) => {
     const _id = req.params.id
 
@@ -119,6 +168,14 @@ app.get('/tasks/:id', async (req, res) => {
 
 })
 
+
+/* Path to update a task by ID using the patch http method/header
+ * Takes in the task/:id path where :id represents the task id in our mongoDB database
+ * It checks if the update is a valid operation (changes a valid field for our task model)
+ * and runs our validator tests against the updated task. If it is not a valid update,
+ * we send a 400 status back. Otherwise, if a task is not found we send a 404 and a 200 on success.
+ * On error, we send a 400 code back to the client.
+ */
 app.patch('/tasks/:id', async (req, res) => {
     //verify its a legal operation
     const updates = Object.keys(req.body)
