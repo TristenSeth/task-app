@@ -1,7 +1,12 @@
 const mongoose = require('mongoose')
 const validator = require('validator')
 
-//create the user model
+/* User model:
+ * name: Users name
+ * password: password for the user's account
+ * email: users email address
+ * age: optional user's age
+ */
 const User = mongoose.model('User', {
     name: {
         type: String,

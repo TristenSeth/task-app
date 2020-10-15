@@ -1,6 +1,9 @@
 const mongoose = require('mongoose')
 
-//create task model
+/* task model:
+ * description: string describing what the task is
+ * completed: boolean of the status of task
+ */
 const Task = mongoose.model('Task', {
     description: {
         type: String,
