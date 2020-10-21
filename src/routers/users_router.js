@@ -1,5 +1,6 @@
 const express = require('express')
 const User = require('../models/user')
+const auth = require('../middleware/auth')
 const router = new express.Router()
 
 
@@ -12,45 +13,68 @@ router.post('/users', async (req, res) => {
     const user = new User(req.body)
 
     try {
+        const token = await user.generate_auth_token()
         //try to save user
         await user.save()
-        res.status(201).send(user)
+        res.status(201).send({user, token})
     } catch (e) {
         //promise during await func failed
         res.status(400).send(e)
     }
 })
 
-/* Path to get all users. On error sends back a 500 status to requestor
- * On success sends back list of users in the database
+/* Path to log user in
  */
-router.get('/users', async (req, res) => {
-    //find all users in database
+router.post('/users/login', async (req, res) => {
     try {
-        const users = await User.find({})
-        res.send(users)
+        const user = await User.findByCredentials(req.body.email, req.body.password)
+        //generate a json token for user
+        const token = await user.generate_auth_token()
+        res.send({user, token})
+    } catch (e) {
+        res.status(400).send()
+    }
+})  
+
+
+/* Route to log user out
+ *
+ */
+router.post('/users/logout', auth, async (req, res) => {
+    try {
+        req.user.tokens = req.user.tokens.filter((token) => {
+            //return true when token we see is not current token for authorization
+            return token.token !== req.token
+        })
+
+        await req.user.save()
+
+        res.send()
     } catch (e) {
         res.status(500).send()
     }
 })
 
-/* Path to get individual users by id. If no user is found, return a 404 status to requestor
- * If user is found, return user to requestor with default status code. Otherwise, on error return a 500 status
+/* Logout user of all sessions
+ *
  */
-router.get('/users/:id', async (req, res) => {
-    const _id = req.params.id
-
+router.post('/users/logoutAll', auth, async (req, res) => {
     try {
-        const user = await User.findById(_id)
-        if (!user) {
-            //no user found
-            return res.status(404).send()
-        }
-
-        res.send(user)
+        //empty the tokens array
+        req.user.tokens = [[]]
+        await req.user.save()
+        res.send()
     } catch (e) {
         res.status(500).send()
     }
+})
+
+
+/* Path to get current user info. On error sends back a 500 status to requestor
+ * On success sends back user in the database
+ */
+router.get('/users/me', auth, async (req, res) => {
+    res.send(req.user)
 })
 
 
@@ -61,7 +85,7 @@ router.get('/users/:id', async (req, res) => {
  * we send a 400 status back. Otherwise, if a user is not found we send a 404 and a 200 on success.
  * On error, we send a 400 code back to the client.
  */
-router.patch('/users/:id', async (req, res) => {
+router.patch('/users/me', auth, async (req, res) => {
     const updates = Object.keys(req.body)
     const allowed_updates = ['name', 'email', 'password', 'age']
     const is_valid_operation = updates.every((update) => allowed_updates.includes(update))
@@ -72,14 +96,13 @@ router.patch('/users/:id', async (req, res) => {
     }
 
     try {
-        //asynchronously find user by id and update them. Return the new updated user and run validator tests on it.
-        const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true})
+        //grab user from auth 
+        const user = req.user
 
-        //check that we found a user
-        if (!user) {
-            //no user found
-            return res.status(404).send()
-        }
+        //update each property of user dynamically
+        updates.forEach((update) => user[update] = req.body[update])
+        await user.save()
+        
 
         //send updated user back to requestor
         res.send(user)
@@ -94,18 +117,11 @@ router.patch('/users/:id', async (req, res) => {
  * is sent back. If a user is found the deleted users info is sent back with a 200 status code
  * if an error occurs a 500 status is sent back
  */
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/me', auth, async (req, res) => {
     try {
-        //try to find and delete user
-        const user = await User.findByIdAndDelete(req.params.id)
-
-        if (!user) {
-            //no user found
-            return res.status(404).send()
-        }
-
-        //user found
-        res.send(user)
+        //remove the user from the database
+        await req.user.remove()
+        res.send(req.user)
     } catch (e) {
         //error occured; perhaps incorrect body for request?
         res.status(500).send()

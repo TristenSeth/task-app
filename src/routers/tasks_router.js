@@ -1,14 +1,19 @@
 const express = require('express')
 const Task = require('../models/tasks')
+const auth = require('../middleware/auth')
 const router = new express.Router()
 
 /* Path to create an individual task in the database
  * Sends a 201 code back to requestor on success, and
  * a 400 code on error
  */
-router.post('/tasks', async (req, res) => {
+router.post('/tasks', auth, async (req, res) => {
     //create new task
-    const task = new Task(req.body)
+    //const task = new Task(req.body)
+    const task = new Task({
+        ...req.body, //this copies all fields from re.body over to the new task object
+        owner: req.user._id
+    })
 
     try {
         await task.save()
@@ -67,7 +72,10 @@ router.patch('/tasks/:id', async (req, res) => {
     }
 
     try {
-        const task = await Task.findByIdAndUpdate(req.params.id, req.body, {new: true, runValidators: true})
+        const task = await Task.findById(req.params.id)
+        updates.forEach((update) => task[update] = req.body[update])
+        await task.save()
+         
 
         //no task found
         if (!task) {
